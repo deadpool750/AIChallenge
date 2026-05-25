@@ -104,3 +104,121 @@ tokenized_sentences = [tokenize(sentence) for sentence in sentences]
 print("Example tokenized sentences:")
 for s in tokenized_sentences[:5]:
     print(s)
+
+
+#5. Part I: k-mer based vectorization
+
+"""
+In bioinformatics, k-mers are fixed-length subsequences.
+For example, for DNA sequence "ATGCG" and k = 3:
+
+ATG, TGC, GCG
+
+In text, a similar idea can be used with character n-grams.
+This representation counts local fragments but does not understand meaning.
+"""
+
+
+#5.1DNA k-mer example
+
+dna_sequences = [
+    "ATGCGATACG",
+    "ATGCGATACC",
+    "TTTTGGGCCC",
+    "GCGCGCGCAA",
+    "ATATATATAT",
+]
+
+def get_kmers(sequence, k=3):
+    """
+    Returns all k-mers from a sequence.
+    """
+    return [sequence[i:i+k] for i in range(len(sequence) - k + 1)]
+
+
+k = 3
+
+dna_kmer_counts = []
+
+for seq in dna_sequences:
+    kmers = get_kmers(seq, k)
+    counts = Counter(kmers)
+    dna_kmer_counts.append(counts)
+
+print("\nDNA k-mer counts:")
+for seq, counts in zip(dna_sequences, dna_kmer_counts):
+    print(seq, counts)
+
+
+#5.2 Convert DNA k-mers to table
+
+all_kmers = sorted(set(kmer for counts in dna_kmer_counts for kmer in counts))
+
+dna_kmer_matrix = []
+
+for counts in dna_kmer_counts:
+    row = [counts.get(kmer, 0) for kmer in all_kmers]
+    dna_kmer_matrix.append(row)
+
+dna_kmer_df = pd.DataFrame(dna_kmer_matrix, columns=all_kmers, index=dna_sequences)
+
+print("\nDNA k-mer vectorization table:")
+display(dna_kmer_df)
+
+
+#5.3 Text character k-mer example
+
+text_examples = [
+    "king",
+    "queen",
+    "kingdom",
+    "dog",
+    "cat",
+    "bank",
+    "riverbank",
+]
+
+char_vectorizer = CountVectorizer(analyzer="char", ngram_range=(3, 3))
+char_kmer_matrix = char_vectorizer.fit_transform(text_examples)
+
+char_kmer_df = pd.DataFrame(
+    char_kmer_matrix.toarray(),
+    columns=char_vectorizer.get_feature_names_out(),
+    index=text_examples
+)
+
+print("\nText character 3-mer table:")
+display(char_kmer_df)
+
+
+#5.4 Similarity using k-mer vectors
+
+kmer_sim_matrix = cosine_similarity(char_kmer_matrix)
+
+kmer_sim_df = pd.DataFrame(
+    kmer_sim_matrix,
+    columns=text_examples,
+    index=text_examples
+)
+
+print("\nCosine similarity based on character 3-mers:")
+display(kmer_sim_df.round(3))
+
+
+#5.5 Interpretation
+
+print("""
+Interpretation of k-mer vectorization:
+
+k-mer based representation is simple and useful when local fragments matter.
+For example, DNA sequences with similar short fragments will have similar vectors.
+
+However, k-mer vectorization does not understand semantic meaning.
+For text, 'king' and 'queen' are semantically related, but character k-mers
+do not necessarily show this relationship well.
+
+This is the key limitation:
+k-mer vectors capture surface patterns, not meaning.
+""")
+
+
