@@ -222,3 +222,146 @@ k-mer vectors capture surface patterns, not meaning.
 """)
 
 
+#6.Part II: Word2Vec embeddings
+
+"""
+Word2Vec learns word vectors from word co-occurrence.
+Words appearing in similar contexts receive similar vectors.
+
+Important property:
+Each word has one fixed vector.
+
+For example:
+- 'bank' has one vector
+- the vector is the same in 'money bank' and 'river bank'
+
+This is different from Transformers.
+"""
+
+
+#6.1 Train Word2Vec model
+
+word2vec_model = Word2Vec(
+    sentences=tokenized_sentences,
+    vector_size=50,
+    window=3,
+    min_count=1,
+    workers=4,
+    sg=1,
+    epochs=300,
+    seed=42
+)
+
+print("\nWord2Vec vocabulary:")
+print(list(word2vec_model.wv.index_to_key))
+
+
+#6.2 Show most similar words
+
+query_words = ["king", "queen", "bank", "doctor", "fruit", "capital"]
+
+for word in query_words:
+    print(f"\nMost similar words to '{word}':")
+    similar_words = word2vec_model.wv.most_similar(word, topn=5)
+    for similar_word, score in similar_words:
+        print(f"{similar_word:12s} {score:.3f}")
+
+
+#6.3 Word2Vec similarity examples
+
+word_pairs = [
+    ("king", "queen"),
+    ("king", "dog"),
+    ("doctor", "nurse"),
+    ("france", "germany"),
+    ("apple", "orange"),
+    ("bank", "money"),
+    ("bank", "river"),
+]
+
+w2v_results = []
+
+for w1, w2 in word_pairs:
+    sim = cosine_sim(word2vec_model.wv[w1], word2vec_model.wv[w2])
+    w2v_results.append([w1, w2, sim])
+
+w2v_df = pd.DataFrame(w2v_results, columns=["word 1", "word 2", "Word2Vec cosine similarity"])
+
+print("\nWord2Vec similarity examples:")
+display(w2v_df.round(3))
+
+
+#6.4 Plot selected Word2Vec embeddings
+
+selected_words = [
+    "king", "queen", "prince", "princess",
+    "man", "woman",
+    "france", "germany", "poland",
+    "paris", "berlin", "warsaw",
+    "doctor", "nurse", "patient",
+    "dog", "cat",
+    "bank", "river", "money"
+]
+
+selected_vectors = [word2vec_model.wv[word] for word in selected_words]
+
+plot_embeddings_2d(
+    selected_vectors,
+    selected_words,
+    "Word2Vec embeddings reduced to 2D using PCA"
+)
+
+
+# 6.5 Word2Vec vector arithmetic
+
+"""
+Classic example:
+king - man + woman ≈ queen
+
+Because this is a tiny corpus, results may not be perfect.
+This is useful because the assignment also allows negative examples.
+"""
+
+print("\nVector arithmetic: king - man + woman")
+result = word2vec_model.wv.most_similar(
+    positive=["king", "woman"],
+    negative=["man"],
+    topn=5
+)
+
+for word, score in result:
+    print(f"{word:12s} {score:.3f}")
+
+
+print("\nVector arithmetic: paris - france + germany")
+result = word2vec_model.wv.most_similar(
+    positive=["paris", "germany"],
+    negative=["france"],
+    topn=5
+)
+
+for word, score in result:
+    print(f"{word:12s} {score:.3f}")
+
+
+#6.6 Word2Vec limitation: one vector per word
+
+bank_vector_1 = word2vec_model.wv["bank"]
+bank_vector_2 = word2vec_model.wv["bank"]
+
+print("\nWord2Vec vector for 'bank' is always the same.")
+print("Cosine similarity between 'bank' in two different contexts:")
+print(cosine_sim(bank_vector_1, bank_vector_2))
+
+print("""
+Word2Vec limitation:
+
+The word 'bank' has one embedding.
+Therefore, Word2Vec cannot directly distinguish:
+
+1. bank = financial institution
+2. bank = side of a river
+
+The model can learn that 'bank' is related to both 'money' and 'river',
+but it still stores only one mixed representation for the word.
+""")
