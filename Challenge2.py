@@ -365,3 +365,270 @@ Therefore, Word2Vec cannot directly distinguish:
 The model can learn that 'bank' is related to both 'money' and 'river',
 but it still stores only one mixed representation for the word.
 """)
+
+
+#7. Part III: Transformer encoder embeddings
+
+"""
+Transformers generate contextual embeddings.
+
+This means the vector for a word depends on the sentence where it appears.
+
+Example:
+- "He deposited money in the bank."
+- "The fisherman sat on the bank of the river."
+
+The token 'bank' should have different Transformer embeddings in these sentences.
+"""
+
+
+#7.1 Load pretrained Transformer encoder
+
+model_name = "distilbert-base-uncased"
+
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+transformer_model = AutoModel.from_pretrained(model_name)
+
+transformer_model.eval()
+
+print(f"\nLoaded Transformer model: {model_name}")
+
+
+#7.2 Function for contextual word embedding
+
+def get_contextual_word_embedding(sentence, target_word):
+    """
+    Returns the contextual embedding of a target word inside a sentence.
+
+    This function:
+    1. Tokenizes the sentence using a Transformer tokenizer.
+    2. Finds tokens matching the target word.
+    3. Extracts hidden states from the Transformer.
+    4. If the word is split into multiple subword tokens, it averages them.
+
+    Note:
+    This simple implementation works best for common words that are not heavily split.
+    """
+
+    inputs = tokenizer(sentence, return_tensors="pt")
+
+    with torch.no_grad():
+        outputs = transformer_model(**inputs)
+
+    hidden_states = outputs.last_hidden_state[0]
+
+    tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+
+    target_tokens = tokenizer.tokenize(target_word)
+
+    matching_indices = []
+
+    for i in range(len(tokens) - len(target_tokens) + 1):
+        if tokens[i:i+len(target_tokens)] == target_tokens:
+            matching_indices.extend(range(i, i+len(target_tokens)))
+            break
+
+    if len(matching_indices) == 0:
+        raise ValueError(f"Target word '{target_word}' not found in tokenized sentence: {tokens}")
+
+    embedding = hidden_states[matching_indices].mean(dim=0).numpy()
+
+    return embedding, tokens
+
+
+#7.3 Contextual example with ambiguous word "bank"
+
+bank_sentences = [
+    "He deposited money in the bank.",
+    "The bank approved the loan.",
+    "The fisherman sat on the bank of the river.",
+    "The river bank was covered with grass."
+]
+
+bank_embeddings = []
+
+print("\nTransformer tokenization examples:")
+
+for sentence in bank_sentences:
+    emb, tokens = get_contextual_word_embedding(sentence, "bank")
+    bank_embeddings.append(emb)
+
+    print("\nSentence:", sentence)
+    print("Tokens:", tokens)
+
+
+#7.4 Similarity between contextual bank embeddings
+
+bank_context_results = []
+
+for i in range(len(bank_sentences)):
+    for j in range(i + 1, len(bank_sentences)):
+        sim = cosine_sim(bank_embeddings[i], bank_embeddings[j])
+        bank_context_results.append([
+            bank_sentences[i],
+            bank_sentences[j],
+            sim
+        ])
+
+bank_context_df = pd.DataFrame(
+    bank_context_results,
+    columns=["sentence 1", "sentence 2", "Transformer cosine similarity for 'bank'"]
+)
+
+print("\nTransformer contextual similarity for the word 'bank':")
+display(bank_context_df.round(3))
+
+
+#7.5 Compare with Word2Vec
+
+print("""
+Comparison:
+
+Word2Vec:
+- The word 'bank' always has the same vector.
+- Similarity between 'bank' and 'bank' is always 1.0.
+
+Transformer:
+- The word 'bank' receives a different vector depending on the sentence.
+- Financial-bank contexts should be closer to each other.
+- River-bank contexts should be closer to each other.
+""")
+
+
+# ------------------------------------------------------------
+# 7.6 Plot contextual Transformer embeddings for "bank"
+# ------------------------------------------------------------
+
+bank_labels = [
+    "bank: money deposit",
+    "bank: loan",
+    "bank: fisherman river",
+    "bank: river grass"
+]
+
+plot_embeddings_2d(
+    bank_embeddings,
+    bank_labels,
+    "Transformer contextual embeddings of the word 'bank'"
+)
+
+
+#8. More examples: same word, different context
+
+"""
+Another ambiguous word: apple
+
+Apple can mean:
+1. fruit
+2. technology company
+
+Word2Vec would store one vector for 'apple'.
+Transformer can create different vectors depending on context.
+"""
+
+apple_sentences = [
+    "I ate a fresh apple for breakfast.",
+    "The apple was sweet and juicy.",
+    "Apple released a new iPhone model.",
+    "Apple is one of the largest technology companies."
+]
+
+apple_embeddings = []
+
+for sentence in apple_sentences:
+    emb, tokens = get_contextual_word_embedding(sentence, "apple")
+    apple_embeddings.append(emb)
+
+apple_context_results = []
+
+for i in range(len(apple_sentences)):
+    for j in range(i + 1, len(apple_sentences)):
+        sim = cosine_sim(apple_embeddings[i], apple_embeddings[j])
+        apple_context_results.append([
+            apple_sentences[i],
+            apple_sentences[j],
+            sim
+        ])
+
+apple_context_df = pd.DataFrame(
+    apple_context_results,
+    columns=["sentence 1", "sentence 2", "Transformer cosine similarity for 'apple'"]
+)
+
+print("\nTransformer contextual similarity for the word 'apple':")
+display(apple_context_df.round(3))
+
+apple_labels = [
+    "apple: fruit breakfast",
+    "apple: sweet fruit",
+    "apple: iPhone",
+    "apple: tech company"
+]
+
+plot_embeddings_2d(
+    apple_embeddings,
+    apple_labels,
+    "Transformer contextual embeddings of the word 'apple'"
+)
+
+
+#9. Sentence-level Transformer embeddings
+
+"""
+A Transformer can also represent whole sentences.
+A simple method is to average token embeddings.
+
+This is not always the best method, but it is enough for demonstration.
+"""
+
+
+def get_sentence_embedding(sentence):
+    """
+    Returns a sentence embedding by averaging token embeddings.
+    """
+    inputs = tokenizer(sentence, return_tensors="pt", truncation=True)
+
+    with torch.no_grad():
+        outputs = transformer_model(**inputs)
+
+    hidden_states = outputs.last_hidden_state[0]
+
+    attention_mask = inputs["attention_mask"][0].numpy()
+
+    valid_token_embeddings = hidden_states[attention_mask == 1]
+
+    sentence_embedding = valid_token_embeddings.mean(dim=0).numpy()
+
+    return sentence_embedding
+
+
+sentence_examples = [
+    "The doctor treated the patient.",
+    "The nurse helped the patient.",
+    "A physician cared for a sick person.",
+    "The dog chased the cat.",
+    "The cat climbed the tree.",
+    "Paris is the capital of France.",
+    "Berlin is the capital of Germany.",
+    "I deposited money in the bank.",
+    "The fisherman sat on the river bank."
+]
+
+sentence_embeddings = [get_sentence_embedding(sentence) for sentence in sentence_examples]
+
+sentence_sim_matrix = cosine_similarity(sentence_embeddings)
+
+sentence_sim_df = pd.DataFrame(
+    sentence_sim_matrix,
+    columns=sentence_examples,
+    index=sentence_examples
+)
+
+print("\nTransformer sentence embedding similarity:")
+display(sentence_sim_df.round(3))
+
+plot_embeddings_2d(
+    sentence_embeddings,
+    sentence_examples,
+    "Transformer sentence embeddings reduced to 2D using PCA"
+)
