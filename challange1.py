@@ -22,13 +22,17 @@ def f3(x):
 def f4(x):
     return np.sin(3*x) + 0.3*x
 
+def f5(x):
+    return x
+
 
 #dictionary storing function names and their actual formulas
 functions = {
     "sin(x)": f1,
     "x^2": f2,
     "exp(-x^2)": f3,
-    "sin(3x) + 0.3x": f4
+    "sin(3x) + 0.3x": f4,
+    "x": f5
 }
 
 
@@ -39,32 +43,32 @@ class MLP(nn.Module):
 
         # Structure:
         # 1 input value x
-        #   first hidden layer with 32 neurons
+        #   first hidden layer with 16 neurons
         #   Tanh activation
-        #   second hidden layer with 32 neurons
+        #   second hidden layer with 16 neurons
         #   Tanh activation
         #   final output layer with 1 value y
 
         self.net = nn.Sequential(
-            nn.Linear(1, 32),
+            nn.Linear(1, 16),
             nn.Tanh(),
-            nn.Linear(32, 32),
+            nn.Linear(16, 16),
             nn.Tanh(),
-            nn.Linear(32, 1)
+            nn.Linear(16, 1)
         )
 
     def forward(self, x):
         return self.net(x)
 
 
-#training x-values 200 spaced points from -3 to 3
-x_train = np.linspace(-3, 3, 200)
+#training x-values 100 spaced points from -3 to 3
+x_train = np.linspace(-3, 3, 100)
 
-#testing x-values 400 points for a smoother final graph
-x_test = np.linspace(-3, 3, 400)
+#testing x-values 200 points for a smoother final graph
+x_test = np.linspace(-3, 3, 200)
 
-#one figure to for the 4 plots
-plt.figure(figsize=(14, 10))
+#one figure to for the 5 plots
+plt.figure(figsize=(10, 8))
 
 
 #loop through each function
@@ -88,10 +92,10 @@ for i, (name, func) in enumerate(functions.items(), 1):
 
     #optimizer
     #lr = learning rate = how big each update step should be
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    optimizer = optim.Adam(model.parameters(), lr=0.005)
 
-    #training for 2000 epochs
-    for epoch in range(2000):
+    #training for 1000 epochs
+    for epoch in range(1000):
 
         #remove old stored gradients
         #gradients tell the model how to change its weights
@@ -121,7 +125,7 @@ for i, (name, func) in enumerate(functions.items(), 1):
     mse = np.mean((y_test - y_pred) ** 2)
 
     #plots
-    plt.subplot(2, 2, i)
+    plt.subplot(2, 3, i)
     plt.plot(x_test, y_test, label="True function")
     plt.plot(x_test, y_pred, "--", label="MLP approximation")
     plt.scatter(x_train, y_train, s=10, alpha=0.4, label="Training points")
