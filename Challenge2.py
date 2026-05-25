@@ -632,3 +632,185 @@ plot_embeddings_2d(
     sentence_examples,
     "Transformer sentence embeddings reduced to 2D using PCA"
 )
+
+
+#10. Direct comparison:
+#k-mer vs Word2Vec vs Transformer
+
+comparison_table = pd.DataFrame({
+    "Method": [
+        "k-mer vectorization",
+        "Word2Vec",
+        "Transformer encoder"
+    ],
+    "Representation level": [
+        "Fixed fragments / n-grams",
+        "Word-level embeddings",
+        "Contextual token or sentence embeddings"
+    ],
+    "Learns meaning?": [
+        "No, mostly surface pattern similarity",
+        "Partially, from word co-occurrence",
+        "Yes, strongly context-dependent"
+    ],
+    "Context-sensitive?": [
+        "No",
+        "No",
+        "Yes"
+    ],
+    "Example limitation": [
+        "'king' and 'queen' may look unrelated if their character fragments differ",
+        "'bank' has one vector for both money bank and river bank",
+        "Can still fail on rare words, long reasoning, or domain-specific language"
+    ]
+})
+
+print("\nSummary comparison table:")
+display(comparison_table)
+
+
+#11. Negative examples / model failure cases
+
+"""
+Negative examples are useful in the report.
+
+They show that embeddings are not perfect.
+"""
+
+
+#11.1 Word2Vec negative example
+
+print("\nWord2Vec negative example:")
+
+try:
+    result = word2vec_model.wv.most_similar(
+        positive=["paris", "poland"],
+        negative=["france"],
+        topn=5
+    )
+
+    print("Expected approximate answer: Warsaw")
+    print("Actual results:")
+
+    for word, score in result:
+        print(f"{word:12s} {score:.3f}")
+
+except KeyError as e:
+    print("Word missing from vocabulary:", e)
+
+
+print("""
+Why this may fail:
+
+The local Word2Vec model was trained on a tiny corpus.
+Real Word2Vec models need very large datasets to learn reliable analogies.
+Therefore, wrong results are expected and can be discussed as a limitation.
+""")
+
+
+#11.2 Transformer negative example
+
+negative_sentences = [
+    "The bat flew out of the cave.",
+    "He swung the bat during the baseball game.",
+    "The bat is an animal.",
+    "The bat was made of wood."
+]
+
+bat_embeddings = []
+
+for sentence in negative_sentences:
+    emb, tokens = get_contextual_word_embedding(sentence, "bat")
+    bat_embeddings.append(emb)
+
+bat_sim_matrix = cosine_similarity(bat_embeddings)
+
+bat_sim_df = pd.DataFrame(
+    bat_sim_matrix,
+    columns=negative_sentences,
+    index=negative_sentences
+)
+
+print("\nTransformer contextual similarity for 'bat':")
+display(bat_sim_df.round(3))
+
+plot_embeddings_2d(
+    bat_embeddings,
+    [
+        "bat: animal cave",
+        "bat: baseball",
+        "bat: animal",
+        "bat: wooden object"
+    ],
+    "Transformer contextual embeddings of the word 'bat'"
+)
+
+print("""
+Transformer limitation:
+
+The Transformer usually captures context better than Word2Vec.
+However, it can still produce unexpected similarities.
+
+Reasons:
+- The model may rely on broad sentence patterns.
+- Simple average or token extraction may not perfectly represent meaning.
+- Some contexts may be too short or ambiguous.
+""")
+
+
+#12. Optional: compare Word2Vec and Transformer on the same word
+
+"""
+This section directly demonstrates the main difference:
+
+Word2Vec:
+bank = one static vector
+
+Transformer:
+bank in financial sentence != bank in river sentence
+"""
+
+direct_comparison = pd.DataFrame({
+    "Example": [
+        "Word2Vec: bank in financial sentence",
+        "Word2Vec: bank in river sentence",
+        "Transformer: bank in financial sentence",
+        "Transformer: bank in river sentence"
+    ],
+    "Vector behavior": [
+        "Same vector",
+        "Same vector",
+        "Contextual vector",
+        "Contextual vector"
+    ],
+    "Can distinguish meaning?": [
+        "No",
+        "No",
+        "Yes",
+        "Yes"
+    ]
+})
+
+print("\nDirect comparison:")
+display(direct_comparison)
+
+
+w2v_bank_similarity = cosine_sim(word2vec_model.wv["bank"], word2vec_model.wv["bank"])
+transformer_bank_similarity = cosine_sim(bank_embeddings[0], bank_embeddings[2])
+
+print("\nSimilarity comparison:")
+print(f"Word2Vec bank vs bank similarity: {w2v_bank_similarity:.3f}")
+print(f"Transformer financial bank vs river bank similarity: {transformer_bank_similarity:.3f}")
+
+
+#15. Save selected results to CSV files
+
+dna_kmer_df.to_csv("dna_kmer_vectors.csv")
+char_kmer_df.to_csv("text_char_kmer_vectors.csv")
+kmer_sim_df.to_csv("kmer_similarity.csv")
+w2v_df.to_csv("word2vec_similarity_examples.csv")
+bank_context_df.to_csv("transformer_bank_context_similarity.csv")
+apple_context_df.to_csv("transformer_apple_context_similarity.csv")
+comparison_table.to_csv("method_comparison_table.csv", index=False)
+
+print("\nCSV result files saved.")
